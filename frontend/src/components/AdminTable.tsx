@@ -48,7 +48,7 @@ export default function AdminTable<T extends Record<string, any>>({
                 <IconButton size="small" onClick={() => onDelete?.(row)} disabled={!onDelete}>
                   <DeleteIcon fontSize="small" />
                 </IconButton>
-                <IconButton size="small" onClick={() => onView?.(row)} disabled={!onView}>
+                <IconButton size="small" onClick={() => onView?.(row)} disabled={!onView} title="View Page & Video Conference">
                   <VisibilityIcon fontSize="small" />
                 </IconButton>
               </td>

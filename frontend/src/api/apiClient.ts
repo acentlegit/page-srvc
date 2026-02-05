@@ -81,7 +81,10 @@ export const apiCall = async <T>(
     url = `${API_BASE_URL}${API_PATH_PREFIX}${endpoint}`;
   }
   
-  console.log('API Call URL:', url, '| Endpoint:', endpoint, '| Base:', API_BASE_URL, '| Prefix:', API_PATH_PREFIX);
+  // Only log in development mode to reduce console noise
+  if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_API === 'true') {
+    console.log('API Call URL:', url, '| Endpoint:', endpoint, '| Base:', API_BASE_URL, '| Prefix:', API_PATH_PREFIX);
+  }
   
   // Get topic header from .env if needed
   // For staging backend page operations, default to 'pages' if not set
@@ -97,8 +100,8 @@ export const apiCall = async <T>(
     ...options.headers,
   } as HeadersInit;
   
-  // Log headers for debugging (without sensitive data)
-  if (IS_STAGING_BACKEND) {
+  // Only log headers in development mode with debug flag
+  if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_API === 'true' && IS_STAGING_BACKEND) {
     const headersObj = headers as any;
     console.log('Request Headers:', { 
       'Content-Type': headersObj['Content-Type'],
@@ -132,13 +135,16 @@ export const apiCall = async <T>(
     const error = new Error(`API Error: ${response.status} ${response.statusText} - ${errorText}`);
     // Add status code to error for easier checking
     (error as any).status = response.status;
+    (error as any).is404 = response.status === 404;
     throw error;
   }
 
   const json = await response.json();
   
-  // Log full response for debugging (with JSON stringify for better visibility)
-  console.log('API Response (full):', JSON.stringify(json, null, 2));
+  // Only log responses in development mode with debug flag to reduce console noise
+  if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_API === 'true') {
+    console.log('API Response (full):', JSON.stringify(json, null, 2));
+  }
   
   // Handle Swagger API response format: { data: {...}, status: true, message: "..." }
   if (json && typeof json === 'object' && 'data' in json && 'status' in json) {
@@ -358,11 +364,21 @@ export const pagesApi = {
   get: (id: string) => {
     return apiCall<PageModel>(`${API_ENDPOINT_PAGES}/${id}`).catch((error: any) => {
       if (IS_STAGING_BACKEND && error.message && error.message.includes('404')) {
-        console.warn(`Swagger /pages/${id} endpoint not available (404), returning mock page`);
+        // Silently fallback to localStorage - 404 is expected when endpoint doesn't exist
+        try {
+          const storedPages = JSON.parse(localStorage.getItem('localPages') || '[]') as PageModel[]
+          const foundPage = storedPages.find(p => p.id === id)
+          if (foundPage) {
+            return foundPage
+          }
+        } catch (e) {
+          // Ignore localStorage errors
+        }
+        // Return a basic page structure if not found
         return {
           id,
           type: 'LiveGroup' as const,
-          name: 'Mock Page',
+          name: 'Untitled Page',
           members: [],
           connections: {},
           createdAt: Date.now(),

@@ -42,6 +42,7 @@ export default function App() {
           
           {/* Communication Section */}
           <Route path="/communication/pages" element={<PagesListPage />} />
+          <Route path="/communication/pages/demo" element={<PageDetailPage />} />
           <Route path="/communication/pages/new" element={<PageCreatePage />} />
           <Route path="/communication/pages/update" element={<UpdatePagePage />} />
           <Route path="/communication/pages/sync" element={<SyncPagePage />} />

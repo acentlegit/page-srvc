@@ -11,9 +11,11 @@ export default function PageCreatePage() {
   const [description, setDescription] = useState('')
   const [visibility, setVisibility] = useState('Private')
   const [userInput, setUserInput] = useState('')
-  const [users, setUsers] = useState<string[]>(['alex@beam.com', 'jamie@beam.com'])
+  const [users, setUsers] = useState<string[]>([])
   const isEditMode = useMemo(() => Boolean(locationState.pageId), [locationState.pageId])
   const [editingId, setEditingId] = useState<string | null>(locationState.pageId ?? null)
+  const [selectedMedia, setSelectedMedia] = useState<File[]>([])
+  const [mediaPreviews, setMediaPreviews] = useState<Array<{ type: 'image' | 'audio' | 'video', url: string, filename: string }>>([])
 
   useEffect(() => {
     if (!locationState.pageId) return
@@ -44,6 +46,41 @@ export default function PageCreatePage() {
     setUsers((prev) => prev.filter((u) => u !== email))
   }
 
+  // Handle media file selection
+  const handleMediaSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    setSelectedMedia((prev) => [...prev, ...files])
+
+    // Create previews
+    const newPreviews: Array<{ type: 'image' | 'audio' | 'video', url: string, filename: string }> = []
+    for (const file of files) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const fileType = file.type.startsWith('image/') ? 'image' : 
+                        file.type.startsWith('audio/') ? 'audio' : 
+                        file.type.startsWith('video/') ? 'video' : 'image'
+        
+        newPreviews.push({
+          type: fileType as 'image' | 'audio' | 'video',
+          url: reader.result as string,
+          filename: file.name
+        })
+        
+        if (newPreviews.length === files.length) {
+          setMediaPreviews((prev) => [...prev, ...newPreviews])
+        }
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const removeMedia = (index: number) => {
+    setSelectedMedia((prev) => prev.filter((_, i) => i !== index))
+    setMediaPreviews((prev) => prev.filter((_, i) => i !== index))
+  }
+
   const [response, setResponse] = useState<any>(null)
 
   const persistPage = async (status: 'Active' | 'Draft') => {
@@ -71,13 +108,26 @@ export default function PageCreatePage() {
         // Don't redirect - stay on the page
       } else {
         // Create new page
-        const result = await pagesApi.create({
+        const pageData: any = {
           type: 'LiveGroup',
           name: trimmedName,
-          title: trimmedName, // Add title field for response format
+          title: trimmedName,
           content: description || '',
           members,
-        })
+        }
+
+        // Store media in localStorage for the new page
+        if (mediaPreviews.length > 0) {
+          // We'll store media after page creation
+          pageData._media = mediaPreviews
+        }
+
+        const result = await pagesApi.create(pageData)
+        
+        // Store media in localStorage with page ID
+        if (mediaPreviews.length > 0 && result.id) {
+          localStorage.setItem(`pageMedia_${result.id}`, JSON.stringify(mediaPreviews))
+        }
         
         // Display the response in JSON format as shown in image
         setResponse(result)
@@ -160,6 +210,77 @@ export default function PageCreatePage() {
             </span>
           ))}
         </div>
+      </div>
+
+      {/* Media Upload Section */}
+      <div style={{ marginBottom: 16 }}>
+        <div className="small-label">Add Media (Images, Audio, Video)</div>
+        <label style={{ 
+          display: 'inline-block', 
+          padding: '10px 16px', 
+          background: '#f0f7ff', 
+          border: '1px solid #b3d9ff', 
+          borderRadius: 6, 
+          cursor: 'pointer',
+          fontSize: 13,
+          fontWeight: 500,
+          color: '#0066cc'
+        }}>
+          📎 Choose Files
+          <input
+            type="file"
+            multiple
+            accept="image/*,audio/*,video/*"
+            onChange={handleMediaSelect}
+            style={{ display: 'none' }}
+          />
+        </label>
+        
+        {mediaPreviews.length > 0 && (
+          <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12 }}>
+            {mediaPreviews.map((preview, idx) => (
+              <div key={idx} style={{ position: 'relative', border: '1px solid #e6e6e6', borderRadius: 6, overflow: 'hidden' }}>
+                {preview.type === 'image' && (
+                  <img src={preview.url} alt={preview.filename} style={{ width: '100%', height: 100, objectFit: 'cover' }} />
+                )}
+                {preview.type === 'audio' && (
+                  <div style={{ width: '100%', height: 100, background: '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>
+                    🎵
+                  </div>
+                )}
+                {preview.type === 'video' && (
+                  <div style={{ width: '100%', height: 100, background: '#fce4ec', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>
+                    🎥
+                  </div>
+                )}
+                <button
+                  onClick={() => removeMedia(idx)}
+                  style={{
+                    position: 'absolute',
+                    top: 4,
+                    right: 4,
+                    border: 'none',
+                    background: 'rgba(0,0,0,0.6)',
+                    color: '#fff',
+                    borderRadius: '50%',
+                    width: 24,
+                    height: 24,
+                    cursor: 'pointer',
+                    fontSize: 16,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  ×
+                </button>
+                <div style={{ padding: 4, fontSize: 10, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {preview.filename}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: 12 }}>
