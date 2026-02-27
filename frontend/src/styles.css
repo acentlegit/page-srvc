@@ -1,0 +1,57 @@
+:root{
+  --brand:#2aa8c8;
+  --bg:#f5f7fb;
+  --text:#1d2b3a;
+  --muted:#7b8794;
+  --border:#e6e6e6;
+}
+
+*{ box-sizing:border-box; }
+body{
+  margin:0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+a{ color:inherit; }
+
+.btn{
+  background:#1976d2;
+  color:#fff;
+  border:none;
+  padding:10px 16px;
+  border-radius:6px;
+  cursor:pointer;
+  font-weight:600;
+}
+.btn:hover{ opacity:.92; }
+
+.btn-secondary{
+  background:#2aa8c8;
+}
+
+.card{
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:18px;
+}
+
+hr.sep{
+  margin:20px 0;
+  border:1px solid #eee;
+}
+
+.input, .select{
+  width:100%;
+  padding:10px;
+  border-radius:6px;
+  border:1px solid #ddd;
+}
+
+.small-label{
+  font-size:12px;
+  color:#666;
+  margin-bottom:4px;
+}

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT Connection Tester</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .url-list {
+            list-style: none;
+            padding: 0;
+        }
+        .url-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f9f9f9;
+            border-left: 4px solid #ddd;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .url-item:hover {
+            background: #e9e9e9;
+            border-left-color: #007bff;
+        }
+        .url-item.testing {
+            border-left-color: #ffc107;
+            background: #fff3cd;
+        }
+        .url-item.success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        .url-item.error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 MQTT Connection Tester</h1>
+        <p>This tool will test multiple MQTT URLs to find the working one for staging.</p>
+        
+        <ul class="url-list" id="urlList"></ul>
+        
+        <button id="testBtn" onclick="testAll()">Test All URLs</button>
+        
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        const urls = [
+            'wss://mqtt.staging.beamdev.hu:443/mqtt',
+            'ws://mqtt.staging.beamdev.hu:9001',
+            'wss://staging.beamdev.hu:443/mqtt',
+            'ws://staging.beamdev.hu:9001/mqtt',
+            'wss://mqtt.staging.beamdev.hu:443/ws',
+        ];
+
+        function createUrlList() {
+            const list = document.getElementById('urlList');
+            urls.forEach((url, index) => {
+                const li = document.createElement('li');
+                li.className = 'url-item';
+                li.id = `url-${index}`;
+                li.innerHTML = `<strong>${url}</strong> <span class="result" id="result-${index}"></span>`;
+                list.appendChild(li);
+            });
+        }
+
+        async function testUrl(url, index) {
+            const item = document.getElementById(`url-${index}`);
+            const result = document.getElementById(`result-${index}`);
+            
+            item.className = 'url-item testing';
+            result.textContent = 'Testing...';
+
+            return new Promise((resolve) => {
+                const clientId = `test-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+                const client = mqtt.connect(url, {
+                    clientId: clientId,
+                    connectTimeout: 5000,
+                    reconnectPeriod: 0,
+                });
+
+                const timeout = setTimeout(() => {
+                    client.end();
+                    item.className = 'url-item error';
+                    result.textContent = '❌ Timeout';
+                    resolve({ url, success: false });
+                }, 5000);
+
+                client.on('connect', () => {
+                    clearTimeout(timeout);
+                    item.className = 'url-item success';
+                    result.textContent = '✅ Connected!';
+                    client.end();
+                    resolve({ url, success: true });
+                });
+
+                client.on('error', (error) => {
+                    clearTimeout(timeout);
+                    item.className = 'url-item error';
+                    result.textContent = `❌ ${error.message || 'Error'}`;
+                    client.end();
+                    resolve({ url, success: false });
+                });
+            });
+        }
+
+        async function testAll() {
+            const btn = document.getElementById('testBtn');
+            const status = document.getElementById('status');
+            
+            btn.disabled = true;
+            btn.textContent = 'Testing...';
+            status.style.display = 'none';
+
+            let workingUrl = null;
+
+            for (let i = 0; i < urls.length; i++) {
+                const result = await testUrl(urls[i], i);
+                if (result.success && !workingUrl) {
+                    workingUrl = result.url;
+                }
+                await new Promise(resolve => setTimeout(resolve, 500)); // Small delay between tests
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Test All URLs';
+
+            if (workingUrl) {
+                status.className = 'status success';
+                status.style.display = 'block';
+                status.innerHTML = `
+                    <strong>✅ Working URL Found!</strong><br>
+                    <code>${workingUrl}</code><br><br>
+                    <strong>Update your .env file:</strong><br>
+                    <code>VITE_MQTT_BROKER_URL=${workingUrl}</code>
+                `;
+            } else {
+                status.className = 'status error';
+                status.style.display = 'block';
+                status.innerHTML = `
+                    <strong>❌ No Working URL Found</strong><br>
+                    Please check:<br>
+                    • VPN connection (if required)<br>
+                    • Network access to staging<br>
+                    • Contact backend team for correct MQTT URL
+                `;
+            }
+        }
+
+        // Initialize
+        createUrlList();
+    </script>
+</body>
+</html>
