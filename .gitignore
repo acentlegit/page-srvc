@@ -1,3 +1,5 @@
 .env
-.env.*frontend/dist/assets/index-BtbFUGys.js
+.env.*
+frontend/dist/assets/index-BtbFUGys.js
 frontend/src/pages/PageDetailPage.tsx
+frontend/node_modules/
